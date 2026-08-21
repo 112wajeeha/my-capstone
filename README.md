@@ -18,3 +18,8 @@ More setup instructions will be added as the project develops.
 ## Project Status
 
 🚧 In development
+
+
+## Development
+
+This project is being developed using an AI-assisted development workflow.
