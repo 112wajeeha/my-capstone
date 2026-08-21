@@ -18,3 +18,9 @@
 
 - Use 2 spaces for indentation.
 - Keep code simple and readable.
+
+## AI Workflow
+
+- Use AI to review and improve code.
+- Review AI-generated changes before accepting them.
+- Keep Git commits small and meaningful.
