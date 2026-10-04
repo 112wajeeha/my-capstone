@@ -23,7 +23,7 @@ export default function Nav() {
           Briefly
         </Link>
 
-        <nav className="flex items-center gap-1 overflow-x-auto">
+        <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {links.map((link) => {
             const isActive =
               link.href === "/"
