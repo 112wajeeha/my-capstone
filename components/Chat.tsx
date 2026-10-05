@@ -82,7 +82,7 @@ export default function Chat() {
       <div
         ref={chatContainerRef}
         onScroll={handleScroll}
-        className="relative max-h-[600px] min-h-[400px] space-y-4 overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6"
+        className="relative h-[60vh] min-h-[350px] max-h-[600px] space-y-4 overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6"
       >
         {messages.length === 0 ? (
           <div className="flex min-h-[350px] items-center justify-center text-center">
