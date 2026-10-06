@@ -5,6 +5,7 @@ import { DefaultChatTransport } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useEffect, useRef, useState } from "react";
+import ToolCard from "./ToolCard";
 
 export default function Chat() {
   const { messages, sendMessage, status, stop } = useChat({
@@ -98,37 +99,78 @@ export default function Chat() {
           </div>
         ) : (
           messages.map((message) => (
-            <div
-              key={message.id}
-              className={
-                message.role === "user"
-                  ? "ml-auto max-w-[85%]"
-                  : "mr-auto max-w-[85%]"
-              }
-            >
-              <p className="mb-1 text-xs font-medium text-zinc-500">
-                {message.role === "user" ? "You" : "Briefly"}
-              </p>
-
+            <div key={message.id}>
               <div
                 className={
                   message.role === "user"
-                    ? "rounded-2xl bg-zinc-950 px-4 py-3 text-sm leading-6 text-white"
-                    : "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-900"
+                    ? "ml-auto max-w-[85%]"
+                    : "mr-auto max-w-[85%]"
                 }
               >
-                {message.parts.map((part, index) =>
-                  part.type === "text" ? (
-                    <div
-                      key={index}
-                      className="prose prose-sm max-w-none prose-zinc"
-                    >
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {part.text}
-                      </ReactMarkdown>
-                    </div>
-                  ) : null
-                )}
+                <p className="mb-1 text-xs font-medium text-zinc-500">
+                  {message.role === "user" ? "You" : "Briefly"}
+                </p>
+
+                <div
+                  className={
+                    message.role === "user"
+                      ? "rounded-2xl bg-zinc-950 px-4 py-3 text-sm leading-6 text-white"
+                      : "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-900"
+                  }
+                >
+                  {message.parts.map((part, index) => {
+                    if (part.type === "text") {
+                      return (
+                        <div
+                          key={index}
+                          className="prose prose-sm max-w-none prose-zinc"
+                        >
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {part.text}
+                          </ReactMarkdown>
+                        </div>
+                      );
+                    }
+
+                   if (part.type === "tool-extractActionItems") {
+  const hasEarlierError = message.parts
+    .slice(0, index)
+    .some(
+      (previousPart) =>
+        previousPart.type === "tool-extractActionItems" &&
+        previousPart.state === "output-error"
+    );
+
+  if (part.state === "output-error" && hasEarlierError) {
+    return null;
+  }
+
+  return (
+    <ToolCard
+      key={index}
+      state={part.state}
+      input={
+        part.state === "input-available"
+          ? part.input
+          : undefined
+      }
+      output={
+        part.state === "output-available"
+          ? part.output
+          : undefined
+      }
+      errorText={
+        part.state === "output-error"
+          ? part.errorText
+          : undefined
+      }
+    />
+  );
+}
+
+                    return null;
+                  })}
+                </div>
               </div>
             </div>
           ))
