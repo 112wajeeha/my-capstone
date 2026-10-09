@@ -1,3 +1,4 @@
+
 "use client";
 
 import ActionItemsResult from "./ActionItemsResult";
@@ -40,6 +41,7 @@ type ToolCardProps = {
   input?: unknown;
   output?: unknown;
   errorText?: string;
+  onRetry?: () => void;
 };
 
 function isToolInput(value: unknown): value is ToolInput {
@@ -74,18 +76,17 @@ export default function ToolCard({
   input,
   output,
   errorText,
+  onRetry,
 }: ToolCardProps) {
   if (state === "input-streaming") {
     return (
       <div className="mt-3 rounded-2xl border border-zinc-200 bg-white p-4">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 animate-pulse rounded-xl bg-zinc-200" />
-
           <div className="flex-1">
             <p className="text-sm font-medium text-zinc-950">
               Reading your notes...
             </p>
-
             <div className="mt-2 h-2 w-40 animate-pulse rounded-full bg-zinc-200" />
           </div>
         </div>
@@ -104,17 +105,14 @@ export default function ToolCard({
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-sm">
             🔎
           </div>
-
           <div>
             <p className="text-sm font-semibold text-blue-950">
               Extracting action items
             </p>
-
             <p className="mt-1 text-xs leading-5 text-blue-800">
               Checking {noteLength.toLocaleString()} characters and{" "}
               {itemCount} candidate {itemCount === 1 ? "item" : "items"}.
             </p>
-
             <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-blue-600">
               extractActionItems
             </p>
@@ -133,7 +131,6 @@ export default function ToolCard({
           <p className="text-sm font-semibold text-red-950">
             We couldn't read the tool result
           </p>
-
           <p className="mt-1 text-xs leading-5 text-red-800">
             The tool returned data in an unexpected format.
           </p>
@@ -156,7 +153,6 @@ export default function ToolCard({
         <p className="text-sm font-semibold text-amber-950">
           Waiting for approval
         </p>
-
         <p className="mt-1 text-xs text-amber-800">
           This tool is waiting for permission to continue.
         </p>
@@ -180,7 +176,6 @@ export default function ToolCard({
         <p className="text-sm font-semibold text-amber-950">
           Tool execution was denied
         </p>
-
         <p className="mt-1 text-xs text-amber-800">
           The action-item extraction did not run.
         </p>
@@ -194,19 +189,18 @@ export default function ToolCard({
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100">
           ⚠️
         </div>
-
         <div className="min-w-0">
           <p className="text-sm font-semibold text-red-950">
             We couldn't verify the action items
           </p>
-
           <p className="mt-1 text-xs leading-5 text-red-800">
             {errorText || "The tool could not complete successfully."}
           </p>
-
           <button
             type="button"
-            className="mt-3 rounded-lg bg-red-950 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-900"
+            onClick={onRetry}
+            disabled={!onRetry}
+            className="mt-3 rounded-lg bg-red-950 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-900 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Retry
           </button>

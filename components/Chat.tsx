@@ -1,14 +1,22 @@
+
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { APICallError, DefaultChatTransport } from "ai";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useEffect, useRef, useState } from "react";
 import ToolCard from "./ToolCard";
 
 export default function Chat() {
-  const { messages, sendMessage, status, stop } = useChat({
+  const {
+    messages,
+    sendMessage,
+    status,
+    stop,
+    error,
+    regenerate,
+  } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
     }),
@@ -16,9 +24,8 @@ export default function Chat() {
 
   const [input, setInput] = useState("");
   const [isUserScrolling, setIsUserScrolling] = useState(false);
-
+  const [isRetryingTool, setIsRetryingTool] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-
   const isWorking = status === "submitted" || status === "streaming";
 
   useEffect(() => {
@@ -55,7 +62,6 @@ export default function Chat() {
     }
 
     setIsUserScrolling(false);
-
     container.scrollTo({
       top: container.scrollHeight,
       behavior: "smooth",
@@ -70,12 +76,23 @@ export default function Chat() {
     }
 
     const message = input.trim();
-
     setInput("");
 
-    await sendMessage({
-      text: message,
-    });
+    await sendMessage({ text: message });
+  }
+
+  async function handleToolRetry() {
+    if (isWorking || isRetryingTool) {
+      return;
+    }
+
+    setIsRetryingTool(true);
+
+    try {
+      await regenerate();
+    } finally {
+      setIsRetryingTool(false);
+    }
   }
 
   return (
@@ -91,7 +108,6 @@ export default function Chat() {
               <h2 className="text-lg font-semibold text-zinc-950">
                 Ask Briefly about your meeting
               </h2>
-
               <p className="mt-2 text-sm text-zinc-500">
                 Paste meeting notes or ask a question about the conversation.
               </p>
@@ -132,41 +148,42 @@ export default function Chat() {
                       );
                     }
 
-                   if (part.type === "tool-extractActionItems") {
-  const hasEarlierError = message.parts
-    .slice(0, index)
-    .some(
-      (previousPart) =>
-        previousPart.type === "tool-extractActionItems" &&
-        previousPart.state === "output-error"
-    );
+                    if (part.type === "tool-extractActionItems") {
+                      const hasEarlierError = message.parts
+                        .slice(0, index)
+                        .some(
+                          (previousPart) =>
+                            previousPart.type === "tool-extractActionItems" &&
+                            previousPart.state === "output-error"
+                        );
 
-  if (part.state === "output-error" && hasEarlierError) {
-    return null;
-  }
+                      if (part.state === "output-error" && hasEarlierError) {
+                        return null;
+                      }
 
-  return (
-    <ToolCard
-      key={index}
-      state={part.state}
-      input={
-        part.state === "input-available"
-          ? part.input
-          : undefined
-      }
-      output={
-        part.state === "output-available"
-          ? part.output
-          : undefined
-      }
-      errorText={
-        part.state === "output-error"
-          ? part.errorText
-          : undefined
-      }
-    />
-  );
-}
+                      return (
+                        <ToolCard
+                          key={index}
+                          state={part.state}
+                          input={
+                            part.state === "input-available"
+                              ? part.input
+                              : undefined
+                          }
+                          output={
+                            part.state === "output-available"
+                              ? part.output
+                              : undefined
+                          }
+                          errorText={
+                            part.state === "output-error"
+                              ? part.errorText
+                              : undefined
+                          }
+                          onRetry={handleToolRetry}
+                        />
+                      );
+                    }
 
                     return null;
                   })}
@@ -179,7 +196,6 @@ export default function Chat() {
         {status === "submitted" && (
           <div className="mr-auto max-w-[85%]">
             <p className="mb-1 text-xs font-medium text-zinc-500">Briefly</p>
-
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-500">
               Thinking...
             </div>
@@ -196,6 +212,25 @@ export default function Chat() {
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-900">
+            {APICallError.isInstance(error) && error.statusCode === 429
+              ? "Briefly is busy. Try again in a moment."
+              : "Something went wrong while sending your message."}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => regenerate()}
+            disabled={isWorking}
+            className="mt-2 rounded-lg bg-red-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="flex gap-2">
         <input
