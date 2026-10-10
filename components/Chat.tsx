@@ -25,7 +25,11 @@ export default function Chat() {
   const [input, setInput] = useState("");
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const [isRetryingTool, setIsRetryingTool] = useState(false);
+  const [isRetryingChat, setIsRetryingChat] = useState(false);
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const retryInProgress = useRef(false);
+
   const isWorking = status === "submitted" || status === "streaming";
 
   useEffect(() => {
@@ -49,7 +53,9 @@ export default function Chat() {
     }
 
     const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
+      container.scrollHeight -
+      container.scrollTop -
+      container.clientHeight;
 
     setIsUserScrolling(distanceFromBottom > 100);
   }
@@ -62,16 +68,19 @@ export default function Chat() {
     }
 
     setIsUserScrolling(false);
+
     container.scrollTo({
       top: container.scrollHeight,
       behavior: "smooth",
     });
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
-    if (!input.trim() || isWorking) {
+    if (!input.trim() || isWorking || retryInProgress.current) {
       return;
     }
 
@@ -81,17 +90,49 @@ export default function Chat() {
     await sendMessage({ text: message });
   }
 
-  async function handleToolRetry() {
-    if (isWorking || isRetryingTool) {
+  async function handleToolRetry(messageId: string) {
+    if (isWorking || retryInProgress.current) {
       return;
     }
 
+    retryInProgress.current = true;
     setIsRetryingTool(true);
 
     try {
-      await regenerate();
+      await regenerate({ messageId });
+    } catch (retryError) {
+      console.error("Tool retry failed:", retryError);
     } finally {
+      retryInProgress.current = false;
       setIsRetryingTool(false);
+    }
+  }
+
+  async function handleChatRetry() {
+    if (isWorking || retryInProgress.current) {
+      return;
+    }
+
+    const failedAssistantMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant");
+
+    if (!failedAssistantMessage) {
+      return;
+    }
+
+    retryInProgress.current = true;
+    setIsRetryingChat(true);
+
+    try {
+      await regenerate({
+        messageId: failedAssistantMessage.id,
+      });
+    } catch (retryError) {
+      console.error("Chat retry failed:", retryError);
+    } finally {
+      retryInProgress.current = false;
+      setIsRetryingChat(false);
     }
   }
 
@@ -108,6 +149,7 @@ export default function Chat() {
               <h2 className="text-lg font-semibold text-zinc-950">
                 Ask Briefly about your meeting
               </h2>
+
               <p className="mt-2 text-sm text-zinc-500">
                 Paste meeting notes or ask a question about the conversation.
               </p>
@@ -153,11 +195,15 @@ export default function Chat() {
                         .slice(0, index)
                         .some(
                           (previousPart) =>
-                            previousPart.type === "tool-extractActionItems" &&
+                            previousPart.type ===
+                              "tool-extractActionItems" &&
                             previousPart.state === "output-error"
                         );
 
-                      if (part.state === "output-error" && hasEarlierError) {
+                      if (
+                        part.state === "output-error" &&
+                        hasEarlierError
+                      ) {
                         return null;
                       }
 
@@ -180,7 +226,7 @@ export default function Chat() {
                               ? part.errorText
                               : undefined
                           }
-                          onRetry={handleToolRetry}
+                          onRetry={() => handleToolRetry(message.id)}
                         />
                       );
                     }
@@ -195,7 +241,10 @@ export default function Chat() {
 
         {status === "submitted" && (
           <div className="mr-auto max-w-[85%]">
-            <p className="mb-1 text-xs font-medium text-zinc-500">Briefly</p>
+            <p className="mb-1 text-xs font-medium text-zinc-500">
+              Briefly
+            </p>
+
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-500">
               Thinking...
             </div>
@@ -214,7 +263,10 @@ export default function Chat() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+        <div
+          role="alert"
+          className="rounded-xl border border-red-200 bg-red-50 p-4"
+        >
           <p className="text-sm font-medium text-red-900">
             {APICallError.isInstance(error) && error.statusCode === 429
               ? "Briefly is busy. Try again in a moment."
@@ -223,11 +275,13 @@ export default function Chat() {
 
           <button
             type="button"
-            onClick={() => regenerate()}
-            disabled={isWorking}
+            onClick={handleChatRetry}
+            disabled={
+              isWorking || isRetryingChat || isRetryingTool
+            }
             className="mt-2 rounded-lg bg-red-900 px-3 py-2 text-xs font-medium text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Retry
+            {isRetryingChat ? "Retrying..." : "Retry"}
           </button>
         </div>
       )}
@@ -237,7 +291,7 @@ export default function Chat() {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask a follow-up question..."
-          disabled={isWorking}
+          disabled={isWorking || isRetryingChat || isRetryingTool}
           className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:bg-zinc-100"
         />
 
@@ -252,7 +306,11 @@ export default function Chat() {
         ) : (
           <button
             type="submit"
-            disabled={!input.trim()}
+            disabled={
+              !input.trim() ||
+              isRetryingChat ||
+              isRetryingTool
+            }
             className="rounded-xl bg-zinc-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Send
